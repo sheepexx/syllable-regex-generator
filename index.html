@@ -77,7 +77,7 @@
   <div class="wrap">
     <div class="card">
       <h1>Syllable Regex Generator</h1>
-      <p class="sub">Add syllables like <em>SA</em> or <em>CHE</em>. You can add multiple at once (comma/space/newline separated). Optional per-syllable limit via <code class="kbd">SYL:2</code>. Click <strong>Generate</strong> to build your regex.</p>
+      <p class="sub">Add your own syllables. You can add multiple at once (comma/space/newline separated). Optional per-syllable limit via <code class="kbd">SYL:2</code>. Click <strong>Generate</strong> to build your regex.</p>
 
       <div class="row two">
         <div class="grid">
@@ -135,7 +135,7 @@
       </div>
 
       <div class="footer">
-        <span>Clean & minimal • Zero dependencies</span>
+        <span>primarily made for wordbomb.io</span>
         <span>by sheepex with love</span>
       </div>
     </div>
@@ -144,11 +144,9 @@
   <script>
     const $ = sel => document.querySelector(sel);
 
-    // Escape regex meta characters (correctly escaped [ and \ )
     const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // State
-    let syllables = []; // [{syl, limit}]
+    let syllables = [];
 
     function splitInput(raw) {
       return (raw || "")
@@ -180,7 +178,6 @@
           upsertSyllable(p, def);
         }
       }
-      // de-dup handled by upsert; now sort by length desc for alternation
       syllables.sort((a, b) => b.syl.length - a.syl.length || a.syl.localeCompare(b.syl));
       renderChips();
     }
@@ -196,8 +193,6 @@
           <button title="Remove" data-role="remove">×</button>
         </span>
       `).join(' ');
-
-      // Wire events for each chip
       box.querySelectorAll('input[data-role="limit"]').forEach(inp => {
         inp.addEventListener('change', (e) => {
           const chip = e.target.closest('.chip');
@@ -218,7 +213,6 @@
 
     function buildRegex(list, useAnchors) {
       if (!list.length) return '';
-      // Ensure all have numeric limits
       const norm = list.map(x => ({ syl: x.syl, limit: (typeof x.limit === 'number' && x.limit >= 0) ? x.limit : Math.max(0, parseInt($('#globalLimit').value || '1', 10)) }));
       const lookaheads = norm.map(({syl, limit}) => `(?!(?:.*${escapeRegex(syl)}){${limit + 1}})`);
       const alt = norm.map(({syl}) => escapeRegex(syl)).join('|');
@@ -248,7 +242,6 @@
       testRegex(pattern, $('#ignoreCase').checked);
     }
 
-    // Buttons
     $('#btnAdd').addEventListener('click', () => {
       const raw = $('#addInput').value;
       if (!raw.trim()) return;
@@ -284,12 +277,8 @@
       $('#ignoreCase').checked = true;
     });
 
-    // Live test on typing / options
     $('#testInput').addEventListener('input', () => testRegex($('#output').value, $('#ignoreCase').checked));
     $('#ignoreCase').addEventListener('change', () => testRegex($('#output').value, $('#ignoreCase').checked));
-
-    // Optional seed example
-    // addFromRaw('EFN, ACK, ZIN, PHA, NNF, HAN, ORT, CAT, HEM, VES, AKE, OSI, OYN, IER, NIE, REN, CHA, SCH, NBU, LGA, RNM, LOD, AM:2, NN, FT, US, FA, EB, EF, RT, OW, HY, IO, YE, PY, MS, UI, AH, OB, IB, SU, RE, NO, HA, OS');
   </script>
 </body>
 </html>
