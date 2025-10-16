@@ -20,6 +20,57 @@ function upsertSyllable(syl, limit = null) {
     syllables.push({ syl, limit: limit });
   }
 }
+// --- Console-Dump -> "SYL:NUM, SYL, ..." ---
+// Regel: Eine Zahlzeile (VM…:10 <NUM>) gehört IMMER zur direkt vorherigen Silbe (VM…:12 <SYL>).
+function normalizeConsoleDumpToAddLine(raw) {
+  const text = String(raw || '').toUpperCase();
+
+  const re = /VM\d+:(\d+)\s+([A-ZÄÖÜß0-9]{1,4})/gi;
+  const sylOnly = /^[A-ZÄÖÜß]{1,4}$/;
+  const numOnly = /^\d+$/;
+
+  const order = [];                   // Reihenfolge des ersten Auftretens
+  const seen  = new Set();            // Duplikate vermeiden
+  const counts = Object.create(null); // SILBE -> zuletzt gesehene Zahl (>1), sonst 1
+
+  let lastSyl = null;                 // die zuletzt gesehene Silbe (wartet evtl. auf ihre Zahl)
+
+  for (const m of text.matchAll(re)) {
+    const code = Number(m[1]);
+    const tok  = m[2];
+
+    if (code === 12 && sylOnly.test(tok)) {
+      // neue Silbe beginnt; die vorherige hat ggf. keine Zahl (=> 1)
+      lastSyl = tok;
+      if (!seen.has(tok)) { seen.add(tok); order.push(tok); }
+      if (!(tok in counts)) counts[tok] = 1; // Default 1, falls keine Zahl folgt
+      continue;
+    }
+
+    if (code === 10 && numOnly.test(tok)) {
+      // Zahl gehört zur *vorherigen* Silbe, falls vorhanden
+      if (lastSyl) {
+        const n = Number(tok) || 1;
+        counts[lastSyl] = n > 0 ? n : 1;  // „letzter gesehener Wert“ pro Silbe
+        lastSyl = null;                   // danach ist die nächste Zeile eine neue Silbe
+      }
+      continue;
+    }
+
+    // Mischformen wie 1M ignorieren
+  }
+
+  // Ausgabe in Erstauftretens-Reihenfolge; :1 auslassen
+  const items = order.map(s => counts[s] > 1 ? `${s}:${counts[s]}` : s);
+  return items.join(', ');
+}
+
+function addFromConsoleDump(raw) {
+  const line = normalizeConsoleDumpToAddLine(raw);
+  if (!line) return 0;
+  addFromRaw(line);                              // dein bestehender Parser frisst "SYL:NUM"
+  return line.split(/\s*,\s*/).length;
+}
 
 function addFromRaw(raw) {
   const parts = splitInput(raw);
@@ -106,9 +157,25 @@ function generate() {
 $('#btnAdd').addEventListener('click', () => {
   const raw = $('#addInput').value;
   if (!raw.trim()) return;
-  addFromRaw(raw);
+
+  // 1) Versuch: kompletten Console-Dump parsen & als "SYL[:NUM], ..." einspeisen
+  const added = addFromConsoleDump(raw);
+
+  // 2) Falls nix erkannt -> normales freies Format
+  if (!added) addFromRaw(raw);
+
   $('#addInput').value = '';
 });
+
+// Komfort: direkt nach Paste automatisch parsen
+$('#addInput').addEventListener('paste', () => {
+  setTimeout(() => {
+    const raw = $('#addInput').value;
+    const added = addFromConsoleDump(raw);
+    if (added) $('#addInput').value = '';
+  }, 0);
+});
+
 
 $('#addInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); $('#btnAdd').click(); }
